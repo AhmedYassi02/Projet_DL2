@@ -15,14 +15,12 @@ caracs = {
     'S':28, 'T':29, 'U':30, 'V':31, 'W':32, 'X':33, 'Y':34, 'Z':35 
 }
 
-def lire_alpha_digit(caractere_list, path_data):
-    # caractere_list = [caracs[el] for el in caractere_list]
-    n = len(caractere_list)
-    caractere_list = map(lambda x: caracs[x], caractere_list)
+def lire_alpha_digit(learn_carac, path_data):
+    n = len(learn_carac)
+    learn_carac = map(lambda x: caracs[x], learn_carac)
     data = scipy.io.loadmat(path_data)
-    data = list(data['dat'][i] for i in caractere_list)
+    data = list(data['dat'][i] for i in learn_carac)
     final_data = []
-    # For each letter
     for i in range(n):
         data_tmp = [data[i][j].flatten() for j in range(39)] 
         final_data.append(np.vstack(data_tmp))
@@ -47,42 +45,17 @@ class RBM:
         self.a = torchnp(np.zeros((1, self.p))).to(device)
         self.W = torchnp(np.random.normal(0, 0.01, size=(self.p, self.q))).to(device)
 
-    
-    def sig(self, x):
-        return 1/(1 + torch.exp(-x))
-    
     def entree_sortie_RBM(self, donnees_entree, sig=True):
         if donnees_entree.shape[1]!= 1:
             raise ValueError("Erreur : 'donnees_entree' n'est pas de la bonne dimension (n, 1, p).")
         if sig is True:
-            res = self.sig(donnees_entree @ self.W + self.b)
+            res = torch.sigmoid(donnees_entree @ self.W + self.b)
         else :
             res = donnees_entree @ self.W + self.b
         return res
 
     def sortie_entree_RBM(self, donnees_sortie):
-        return self.sig(donnees_sortie @ torch.transpose(self.W, 0, 1) + self.a)
-    
-    def generer_image_RBM(self, iterations_gibbs, nb_images, show=False):
-        # initialisation donnees v
-        v = torchnp(np.random.random_sample((nb_images, 1, self.p))).to(device)
-        v = torch.round(v)
-        for i in range(iterations_gibbs):
-            tirage_h = self.entree_sortie_RBM(v)  # (n, 1, q)
-            h = bernoulli(tirage_h)
-            # Tirage de v (taille p x 1) dans loi p(v|h^0)
-            tirage_v = self.sortie_entree_RBM(h)  # (n, 1, p)
-            v = bernoulli(tirage_v)
-        list_img =[]
-        for img in range(nb_images):
-            X = np.reshape(v[img].cpu().flatten(), (20, 16))
-            if show is True:
-                plt.figure()
-                im = plt.imshow(X, cmap='Greys')
-                plt.show()
-            list_img.append(X)
-
-        return list_img 
+        return torch.sigmoid(donnees_sortie @ torch.transpose(self.W, 0, 1) + self.a)
     
     def train_RBM(self, epochs, lr, batch_fraction, x, plot_error=False) :
         # vérifier type de x et le mette en torch
@@ -142,3 +115,24 @@ class RBM:
             plt.xlabel('Epoch')
             plt.grid()
             plt.show()
+            
+    def generer_image_RBM(self, iterations_gibbs, nb_images, show=False):
+        # initialisation donnees v
+        v = torchnp(np.random.random_sample((nb_images, 1, self.p))).to(device)
+        v = torch.round(v)
+        for i in range(iterations_gibbs):
+            tirage_h = self.entree_sortie_RBM(v)  # (n, 1, q)
+            h = bernoulli(tirage_h)
+            # Tirage de v (taille p x 1) dans loi p(v|h^0)
+            tirage_v = self.sortie_entree_RBM(h)  # (n, 1, p)
+            v = bernoulli(tirage_v)
+        list_img =[]
+        for img in range(nb_images):
+            X = np.reshape(v[img].cpu().flatten(), (20, 16))
+            if show is True:
+                plt.figure()
+                im = plt.imshow(X, cmap='Greys')
+                plt.show()
+            list_img.append(X)
+
+        return list_img 

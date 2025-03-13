@@ -27,7 +27,7 @@ class DBN(RBM):
         i = 0
         if type(x) == np.ndarray: x = torchnp(x).double().to(device)
         if len(epochs) != self.nb_couche - 1: epochs = [epochs[0]] * (self.nb_couche - 1)
-        for rbm in self.list_RBM[0:layers] :
+        for rbm in self.list_RBM[0:layers]:
             i += 1
             print(f"====================== RBM n°{i} ======================\n")
             rbm.train_RBM(epochs=epochs[i-1], lr=lr, batch_fraction=batch_fraction, x=x, plot_error=plot_error)
