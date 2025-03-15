@@ -25,6 +25,16 @@ class RBM:
         return torch.sigmoid(donnees_sortie @ torch.transpose(self.W, 0, 1) + self.a)
     
     def train_RBM(self, x, epochs, lr, batch_size = None, plot=False, show_progress=False) :
+        """Boucle d'entraînement pour une RBM.
+
+        Args:
+            x (np.array): Données d'entraînement
+            epochs (int): Nombre d'itérations pour chaque couche
+            lr (float): Taux d'apprentissage
+            batch_size (int): Taille du batch
+            plot (bool): Si True, affiche la courbe d'erreur de reconstruction
+            show_progress (bool): Si True, affiche la barre de progression de l'entraînement
+        """
 
         if isinstance(x, np.ndarray): 
             x = torch.from_numpy(x).to(device=device, dtype=torch.double)  
@@ -44,9 +54,8 @@ class RBM:
             
             for j in range(0, x.shape[0], batch_size):
                 X_batch = X0_suffled[j:min(j + batch_size, x.shape[0])]
-                v0 = X_batch
+                v0 = X_batch # [batch_size, 1, p]
                 ## Forward pass
-                # v0 = [batch_size, 1, p]
                 p_h_v0 = self.entree_sortie_RBM(v0)  # [batch_size, 1, q]
                 h0 = torch.bernoulli(p_h_v0) # [batch_size, 1, q]
                 p_v_h0 = self.sortie_entree_RBM(h0)  # [batch_size, 1, p]
@@ -68,7 +77,6 @@ class RBM:
                 
             H = self.entree_sortie_RBM(x)
             X_rec = self.sortie_entree_RBM(H)
-            # erreur = np.linalg.norm(x.cpu() - X_rec.cpu(), ord='fro')**2 / X_rec.shape[0]
             erreur = torch.norm(x - X_rec, p='fro')**2 / X_rec.shape[0]
             error_list.append(erreur)
             if show_progress:

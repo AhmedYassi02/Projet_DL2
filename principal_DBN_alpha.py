@@ -1,49 +1,90 @@
-import numpy as np
-import scipy.io
-from math import *
-import torch
-from torch import from_numpy as torchnp
-from principal_RBM_alpha import lire_alpha_digit, RBM
-import matplotlib.pyplot as plt
+from principal_RBM_alpha import *
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-path_data = "data/binaryalphadigs.mat"
-caracs = {
-    '0':0, '1':1, '2':2, '3':3, '3':3, '4':4, '5':5, '6':6, '7':7, '8':8, '9':9, 
-    'A':10, 'B':11, 'C':12, 'D':13, 'E':14, 'F':15, 'G':16, 'H':17, 'I':18,
-    'J':19, 'K':20, 'L':21, 'M':22, 'N':23, 'O':24, 'P':25, 'Q':26, 'R':27,
-    'S':28, 'T':29, 'U':30, 'V':31, 'W':32, 'X':33, 'Y':34, 'Z':35 
-}
 
-class DBN:
-    def __init__(self):
-        pass
-
-    def init_DBN(self, layers):
-        self.layers = layers
-        self.rbms = []
-        for i in range(len(layers)-1):
-            rbm = RBM()
-            rbm.init_RBM(layers[i], layers[i+1])
-            self.rbms.append(rbm)
-        return self.rbms
-    
-    def train_DBN(self, donnees_entree, layers, epochs=1000, lr=0.1, mini_batch_size=10):
-        self.rbms = self.init_DBN(layers)
-        for i in range(len(self.rbms)):
-            if i == 0:
-                donnees = donnees_entree
-            else:
-                donnees = self.rbms[i-1].entree_sortie_RBM(donnees)
-            self.rbms[i].train_RBM(donnees, epochs, lr, mini_batch_size)
-        return self.rbms
+class DBN():
+    def __init__(self, layers):
+        """Initialise un Deep Belief Network (DBN).
+        Args:
+            layers (list): Liste des nombres de neurons dans chaque layer
+        """
+        self.layers = layers 
+        self.nb_couche = len(self.layers)
+        self.list_RBM = []
+        for i in range(self.nb_couche - 1):
+            rbm = RBM( 
+                p = layers[i], 
+                q = layers[i+1],
+            )
+            self.list_RBM.append(rbm)
         
-    
-def generer_image_DBN(DNN, epochs=1000, nb_images=1):
-    for i in range(nb_images):
-        donnees = torch.randn(1, DNN.rbms[0].p).to(device)
-        for i in range(len(DNN.rbms)):
-            donnees = DNN.rbms[i].entree_sortie_RBM(donnees)
-        donnees = donnees.cpu().detach().numpy()
-        plt.imshow(donnees.reshape(39, 39))
-        plt.show()
+    def train_DBN(self, x, epochs, lr, batch_size = None,  plot=False, show_progress=False, layers=None):
+        """Entraîne un DBN.
+
+        Args:
+            (x, epochs, lr, batch_size, plot, show_progress) : Voir train_RBM
+            *epochs (list): Nombre d'itérations pour chaque couche
+            layers (int): Nombre de couches à entraîner (si None : toutes les couches)
+        """
+        if layers is None: 
+            layers = self.nb_couche
+        
+        if batch_size is None :
+            batch_size = int(x.shape[0]*0.2)
+
+        if isinstance(x, np.ndarray): 
+            x = torch.from_numpy(x).to(device=device, dtype=torch.double)  
+        else:
+            x = x.to(device)
+        if len(epochs) != self.nb_couche - 1: 
+            epochs = [epochs[0]] * (self.nb_couche - 1)
+        if show_progress:
+            rbm_iterator = tqdm(self.list_RBM, desc="Training DBN", unit="RBM")
+        else:
+            rbm_iterator = self.list_RBM
+        iter = 0
+        for rbm in rbm_iterator:
+            iter += 1
+            rbm.train_RBM(
+                x, epochs=epochs[iter-1], lr=lr, batch_size=batch_size, plot=plot, show_progress=False
+            )
+            x = rbm.entree_sortie_RBM(x)
+
+
+    def generer_image_DBN(self, iterations_gibbs, nb_images, show=False):
+        """
+        Generate images using the Deep Belief Network (DBN) via Gibbs sampling.
+
+        Args:
+            iterations_gibbs (int): Number of Gibbs sampling iterations.
+            nb_images (int): Number of images to generate.
+            show (bool): If True, display the generated images using matplotlib.
+
+        Returns:
+            list: A list of generated images, each represented as a 2D NumPy array.
+        """
+        # Initialize the visible layer
+        v = torch.randint(0, 2, (nb_images, 1, self.layers[0]), dtype=torch.double, device=device)
+
+        # Gibbs sampling
+        for _ in range(iterations_gibbs):
+            for rbm in self.list_RBM:
+                p_h_v = rbm.entree_sortie_RBM(v)  
+                h = torch.bernoulli(p_h_v) 
+                v = h  
+
+            for rbm in self.list_RBM[::-1]:
+                p_v_h = rbm.sortie_entree_RBM(v)  
+                v = torch.bernoulli(p_v_h) 
+
+        imgs = []
+        for img in range(nb_images):
+            X = v[img].cpu().numpy().reshape(20, 16)  # Reshape to 20x16 and convert to NumPy
+            imgs.append(X)
+            if show:
+                plt.figure()
+                plt.imshow(X, cmap='Greys')
+                plt.axis('off')  
+                plt.show()
+
+        return imgs
+

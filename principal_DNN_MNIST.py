@@ -1,4 +1,4 @@
-from principal_DBN_alpha_2 import *
+from principal_DBN_alpha import *
 from torch import from_numpy as torchnp
 from torch import bernoulli
 
