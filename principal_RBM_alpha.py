@@ -15,11 +15,9 @@ class RBM:
         self.a = torch.zeros((1, self.p), dtype=torch.double, device=device)
         self.W = torch.normal(0, 0.01, size=(self.p, self.q), device=device, dtype=torch.double)
 
-    def entree_sortie_RBM(self, X_H, sigmoid=True):
-        if sigmoid :
-            return torch.sigmoid(X_H @ self.W + self.b)
-        else :
-            return X_H @ self.W + self.b
+    def entree_sortie_RBM(self, X_H):
+        
+        return torch.sigmoid(X_H @ self.W + self.b)
         
     def sortie_entree_RBM(self, donnees_sortie):
         return torch.sigmoid(donnees_sortie @ torch.transpose(self.W, 0, 1) + self.a)
@@ -44,9 +42,8 @@ class RBM:
         error_list = []
         if batch_size is None:
             batch_size = int(x.shape[0]*0.2)
-        epoch_iterator = range(epochs)
-        if show_progress:
-            epoch_iterator = tqdm(epoch_iterator, desc="Training RBM", unit="epoch")
+        epoch_iterator = tqdm(range(epochs), desc="Training RBM", unit="epoch", disable=not show_progress)
+
         for epoch in epoch_iterator:
             shuffled_indices = np.arange(x.shape[0])
             np.random.shuffle(shuffled_indices)

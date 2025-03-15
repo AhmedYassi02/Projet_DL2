@@ -17,16 +17,16 @@ class DBN():
             )
             self.list_RBM.append(rbm)
         
-    def train_DBN(self, x, epochs, lr, batch_size = None,  plot=False, show_progress=False, layers=None):
+    def train_DBN(self, x, epochs, lr, batch_size = None,  plot=False, show_progress=False, train_layers=None):
         """Entraîne un DBN.
 
         Args:
             (x, epochs, lr, batch_size, plot, show_progress) : Voir train_RBM
             *epochs (list): Nombre d'itérations pour chaque couche
-            layers (int): Nombre de couches à entraîner (si None : toutes les couches)
+            train_layers (int): Nombre de couches à entraîner (si None : toutes les couches) [UTILE POUR DNN]
         """
-        if layers is None: 
-            layers = self.nb_couche
+        if train_layers is None: 
+            train_layers = self.nb_couche
         
         if batch_size is None :
             batch_size = int(x.shape[0]*0.2)
@@ -37,12 +37,9 @@ class DBN():
             x = x.to(device)
         if len(epochs) != self.nb_couche - 1: 
             epochs = [epochs[0]] * (self.nb_couche - 1)
-        if show_progress:
-            rbm_iterator = tqdm(self.list_RBM, desc="Training DBN", unit="RBM")
-        else:
-            rbm_iterator = self.list_RBM
+
         iter = 0
-        for rbm in rbm_iterator:
+        for rbm in tqdm(self.list_RBM, desc="Training DBN", unit="RBM", disable= not show_progress)[:train_layers]:
             iter += 1
             rbm.train_RBM(
                 x, epochs=epochs[iter-1], lr=lr, batch_size=batch_size, plot=plot, show_progress=False
