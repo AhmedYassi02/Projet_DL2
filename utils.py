@@ -24,11 +24,10 @@ def lire_alpha_digit(learn_carac, path_data):
         if np.vstack(data_tmp).shape[0] != 39:
             raise ValueError
         
-    p = final_data[0].shape[1]
     final_data = np.vstack(final_data)
     final_data = np.resize(final_data, (final_data.shape[0], 1, final_data.shape[1]))
 
-    return final_data, p
+    return final_data
 
 def sigmoid(z):
     return 1 / (1 + np.exp(-z))
