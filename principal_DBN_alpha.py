@@ -39,7 +39,7 @@ class DBN():
             epochs = [epochs[0]] * (self.nb_couche - 1)
 
         iter = 0
-        for rbm in tqdm(self.list_RBM, desc="Training DBN", unit="RBM", disable= not show_progress)[:train_layers]:
+        for rbm in tqdm(self.list_RBM[:train_layers], desc="Training DBN", unit="RBM", disable= not show_progress):
             iter += 1
             rbm.train_RBM(
                 x, epochs=epochs[iter-1], lr=lr, batch_size=batch_size, plot=plot, show_progress=False

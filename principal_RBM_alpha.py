@@ -16,7 +16,6 @@ class RBM:
         self.W = torch.normal(0, 0.01, size=(self.p, self.q), device=device, dtype=torch.double)
 
     def entree_sortie_RBM(self, X_H):
-        
         return torch.sigmoid(X_H @ self.W + self.b)
         
     def sortie_entree_RBM(self, donnees_sortie):
