@@ -39,13 +39,13 @@ class DBN():
             epochs = [epochs[0]] * (self.nb_couche - 1)
 
         iter = 0
-        for rbm in tqdm(self.list_RBM[:train_layers], desc="Training DBN", unit="RBM", disable= not show_progress):
+        rbm_iterator = tqdm(self.list_RBM[:train_layers], desc="Training DBN", unit="RBM", disable= not show_progress)
+        for rbm in rbm_iterator:
             iter += 1
             rbm.train_RBM(
                 x, epochs=epochs[iter-1], lr=lr, batch_size=batch_size, plot=plot, show_progress=False
             )
-            x = rbm.entree_sortie_RBM(x)
-
+            x = rbm.entree_sortie_RBM(x)     
 
     def generer_image_DBN(self, iterations_gibbs, nb_images, show=False):
         """
@@ -60,7 +60,7 @@ class DBN():
             list: A list of generated images, each represented as a 2D NumPy array.
         """
         # Initialize the visible layer
-        v = torch.randint(0, 2, (nb_images, 1, self.layers[0]), dtype=torch.double, device=device)
+        v = torch.randint(0, 2, (nb_images, self.layers[0]), dtype=torch.double, device=device)
 
         # Gibbs sampling
         for _ in range(iterations_gibbs):
@@ -75,13 +75,8 @@ class DBN():
 
         imgs = []
         for img in range(nb_images):
-            X = v[img].cpu().numpy().reshape(20, 16)  # Reshape to 20x16 and convert to NumPy
+            X = np.reshape(v[img].cpu().flatten(), (20, 16)) # Reshape to 20x16 and convert to NumPy
             imgs.append(X)
-            if show:
-                plt.figure()
-                plt.imshow(X, cmap='Greys')
-                plt.axis('off')  
-                plt.show()
 
         return imgs
 

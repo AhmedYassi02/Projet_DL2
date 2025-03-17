@@ -6,10 +6,10 @@ import torch
 
 class DNN():
     
-    def __init__(self, Q, nb_classes):
-        self.dbn = DBN(Q)
+    def __init__(self, layers_dbn, nb_classes):
+        self.dbn = DBN(layers_dbn)
         # ajouter une couche de classification supplémentaire
-        self.dbn.list_RBM.append(RBM(p=Q[-1], q=nb_classes))
+        self.dbn.list_RBM.append(RBM(p=layers_dbn[-1], q=nb_classes))
         
 
     def pretrain_DNN(self, x, epochs, lr, batch_size=None):
@@ -66,7 +66,7 @@ class DNN():
                 # Mise à jour de la dernière couche 
                 last_layer = self.dbn.list_RBM[-1]
                 delta_b_last = y_hat - y  
-                delta_W_last = torch.transpose(sortie[-2], 1, 2) @ delta_b_last  
+                delta_W_last = sortie[-2].T @ delta_b_last  
 
                 last_layer.W -= lr * delta_W_last.mean(axis=0)
                 last_layer.b -= lr * delta_b_last.mean(axis=0)
@@ -79,11 +79,11 @@ class DNN():
                     if i != 0:
                         # Pour les couches cachées (sauf la première)
                         delta_b = (delta_b @ self.dbn.list_RBM[i + 1].W.T) * (sortie[i] * (1 - sortie[i]))
-                        delta_W = torch.transpose(sortie[i - 1], 1, 2) @ delta_b
+                        delta_W = sortie[i - 1].T @ delta_b
                     else: 
                         # Pour la première couche
                         delta_b = (delta_b @ self.dbn.list_RBM[i + 1].W.T) * (sortie[i] * (1 - sortie[i]))
-                        delta_W = torch.transpose(x, 1, 2) @ delta_b
+                        delta_W = x.T @ delta_b
                     
                     layer.W -= lr * delta_W.mean(axis=0) # (sum over batch divide by batch_size)
                     layer.b -= lr * delta_b.mean(axis=0)
@@ -111,9 +111,9 @@ if __name__ == '__main__':
     # Test DNN sur 2 lettres de Binary Alpha Digits
     path_data = "data/binaryalphadigs.mat"
     data, nb_pixels = lire_alpha_digit(["A", "B"], path_data)
-    Q = [nb_pixels, 200, 200]
+    layers_dbn = [nb_pixels, 200, 200]
     dnn = DNN(
-        Q = Q,
+        layers_dbn = layers_dbn,
         nb_classes=2
         )
     dnn.pretrain_DNN(x=data, epochs=[100], lr=0.1)
