@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from utils import lire_alpha_digit, caracs, path_data
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 class RBM:
     def __init__(self, p, q): 
@@ -14,7 +15,8 @@ class RBM:
         self.q = q  # ( to fine-tune )
         self.b = torch.zeros(self.q, device=device, dtype=torch.double)
         self.a = torch.zeros(self.p, device=device, dtype=torch.double)
-        self.W = torch.normal(0, 0.01, size=(self.p, self.q), device=device, dtype=torch.double)
+        # self.W = torch.normal(0, 0.01, size=(self.p, self.q), device=device, dtype=torch.double)
+        self.W = torch.randn(p, q, device=device, dtype=torch.double) * torch.sqrt(torch.tensor(2.0 / p, device=device, dtype=torch.double))
 
     def entree_sortie_RBM(self, X_H):
         return torch.sigmoid((X_H @ self.W + self.b))

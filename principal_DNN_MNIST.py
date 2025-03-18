@@ -12,13 +12,13 @@ class DNN():
         self.dbn.list_RBM.append(RBM(p=layers_dbn[-1], q=nb_classes))
         
 
-    def pretrain_DNN(self, x, epochs, lr, batch_size=None):
-        self.dbn.train_DBN(x=x, epochs=epochs, lr=lr, train_layers=self.dbn.nb_couche-1, batch_size=batch_size)
+    def pretrain_DNN(self, x, epochs, lr, batch_size=None, show_progress=False):
+        self.dbn.train_DBN(x=x, epochs=epochs, lr=lr, train_layers=self.dbn.nb_couche-1, batch_size=batch_size, show_progress=show_progress)
         
         
     def calcul_softmax(self, rbm, data):
         x = data @ rbm.W + rbm.b
-        return torch.exp(x) / (torch.exp(x).sum(axis=2, keepdims=True))
+        return torch.exp(x) / (torch.exp(x).sum(axis=1, keepdims=True))
 
     def entree_sortie_reseau(self, data):
         sortie = []
@@ -28,6 +28,7 @@ class DNN():
             data = rbm.entree_sortie_RBM(data)
             sortie.append(data)
             data = torch.bernoulli(data)
+            
         rbm = self.dbn.list_RBM[-1]
         y_hat = self.calcul_softmax(rbm, data)
         sortie.append(y_hat)
@@ -37,14 +38,13 @@ class DNN():
         if type(X) == np.ndarray: X = torch.from_numpy(X).double().to(device)
         if type(Y) == np.ndarray: Y = torch.from_numpy(Y).double().to(device)
         
-        
         if batch_size is None:
             batch_size = int(np.floor(0.2 * X.shape[0]))
 
 
         loss_list = []
         epochs_iterator = tqdm(range(epochs), desc="Training DNN", unit="epoch", disable=not show_progress)
-        for _ in epochs_iterator:       
+        for e in epochs_iterator:       
                 
             shuffled_indices = np.arange(X.shape[0])
             np.random.shuffle(shuffled_indices)
@@ -58,23 +58,23 @@ class DNN():
 
                 sortie = self.entree_sortie_reseau(x)
                 y_hat = sortie[-1]
-                loss = -(y * torch.log(y_hat)).sum() 
+                
+                loss = -torch.sum(y * torch.log(y_hat))/batch_size
                 loss_list.append(loss.cpu())
                 if show_progress:
                     epochs_iterator.set_postfix({"Loss": loss.item()})
                 
-                # Mise à jour de la dernière couche 
-                last_layer = self.dbn.list_RBM[-1]
-                delta_b_last = y_hat - y  
-                delta_W_last = sortie[-2].T @ delta_b_last  
+                
+                delta_b = y_hat - y
+                delta_W = sortie[-2].T @ (y_hat-y)  
+  
 
-                last_layer.W -= lr * delta_W_last.mean(axis=0)
-                last_layer.b -= lr * delta_b_last.mean(axis=0)
+                self.dbn.list_RBM[-1].W -= lr * delta_W/batch_size
+                self.dbn.list_RBM[-1].b -= lr * delta_b.mean(axis=0)
 
-               
-                delta_b = delta_b_last  
-                for i in range(self.dbn.nb_couche - 2, -1, -1):  
-                    layer = self.dbn.list_RBM[i]
+            
+                # for i in range(self.dbn.nb_couche - 2, -1, -1):  
+                for i in reversed(range(self.dbn.nb_couche-1)): 
                     
                     if i != 0:
                         # Pour les couches cachées (sauf la première)
@@ -85,8 +85,8 @@ class DNN():
                         delta_b = (delta_b @ self.dbn.list_RBM[i + 1].W.T) * (sortie[i] * (1 - sortie[i]))
                         delta_W = x.T @ delta_b
                     
-                    layer.W -= lr * delta_W.mean(axis=0) # (sum over batch divide by batch_size)
-                    layer.b -= lr * delta_b.mean(axis=0)
+                    self.dbn.list_RBM[i].W -= lr * delta_W/batch_size 
+                    self.dbn.list_RBM[i].b -= lr * delta_b.mean(axis=0) # (sum over batch divide by batch_size)
         if plot is True:
             plt.figure()
             plt.plot(loss_list)
@@ -95,37 +95,59 @@ class DNN():
             plt.xlabel('Epochs')
             plt.ylabel('Loss')
             plt.show()
-        return 0
+
 
     def test_DNN(self, x, y):
         sortie = self.entree_sortie_reseau(x)
         y_hat = sortie[-1].cpu()
-        y_pred = torch.argmax(y_hat, axis=2).cpu()
-        y_true = torch.argmax(y, axis=2).cpu()
+        y_pred = torch.argmax(y_hat, axis=1).cpu()
+        y_true = torch.argmax(y, axis=1).cpu()
         error = (y_pred != y_true).sum()/len(y_true)
         print(f"Taux d'erreur = {error}")
         return error, y_hat
 
 
+
+# for debug
 if __name__ == '__main__':
-    # Test DNN sur 2 lettres de Binary Alpha Digits
-    path_data = "data/binaryalphadigs.mat"
-    data, nb_pixels = lire_alpha_digit(["A", "B"], path_data)
-    layers_dbn = [nb_pixels, 200, 200]
-    dnn = DNN(
-        layers_dbn = layers_dbn,
-        nb_classes=2
-        )
-    dnn.pretrain_DNN(x=data, epochs=[100], lr=0.1)
-    # y shape shoulde be (n, 1, 2) where n is the number of images
-    # test y shape
-    y1 = np.array([[[1, 0]]]*int(data.shape[0]/2))
-    y2 = np.array([[[0, 1]]]*int(data.shape[0]/2))
-    y = np.concatenate((y1, y2), axis=0)
-    y = torch.from_numpy(y).double().to(device)
-    if y.shape != (data.shape[0], 1, 2):
-        raise ValueError("y shape should be (n, 1, 2) where n is the number of images")
-    sortie = dnn.retropropagation(X=data, Y=y, epochs=300, lr=0.1, show_progress=True)
-    # Données de test
-    tau, y_hat = dnn.test_DNN(x=data, y=y)
-    print(y_hat)
+    import torchvision.datasets
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
+
+
+    # if not exist, download mnist dataset
+    train_set = torchvision.datasets.MNIST(root='./data', train=True, transform=None, download=True)
+    test_set = torchvision.datasets.MNIST(root='./data', train=False, transform=None, download=True)
+    batch_size = 100
+
+    train_set.data = (train_set.data > 127).float()
+    test_set.data = (test_set.data > 127).float()
+
+
+    # Applatir les images (28*28) en vecteurs (784)
+    train_mnist = train_set.data.view(train_set.data.shape[0], -1).double().to(device)
+    test_mnist = test_set.data.view(test_set.data.shape[0], -1).double().to(device) 
+
+    # One Hot Encoding des labels
+    labels_train_mnist = torch.nn.functional.one_hot(train_set.targets).float().to(device)
+    labels_test_mnist = torch.nn.functional.one_hot(test_set.targets).float().to(device)
+
+
+    train_mnist.shape, labels_train_mnist.shape, test_mnist.shape, labels_test_mnist.shape
+
+    ## Test du DNN sur MNIST
+    nb_pixels = train_mnist.shape[1]
+    neurons = 200
+    epochs = 200
+    learning_rate = 0.2
+    layers_dbn = [nb_pixels, neurons, neurons, neurons]
+    nb_classes = len(train_set.class_to_idx)
+
+    ### Backpropagation sur 2 DNN
+
+    torch.unique(train_set.targets)
+    dnn_non_pretrain = DNN(layers_dbn, nb_classes=nb_classes)
+    dnn_non_pretrain.retropropagation(X=train_mnist, Y=labels_train_mnist, epochs=epochs, lr=learning_rate, batch_size = 500,show_progress=True)
+    
+    # test du DNN non pré-entraîné
+    dnn_non_pretrain.test_DNN(test_mnist, labels_test_mnist)
