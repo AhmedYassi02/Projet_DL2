@@ -6,22 +6,37 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from utils import lire_alpha_digit, caracs, path_data
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
 
 class RBM:
     def __init__(self, p, q): 
         self.p = p
         self.q = q  # ( to fine-tune )
-        self.b = torch.zeros(self.q, device=device, dtype=torch.double)
-        self.a = torch.zeros(self.p, device=device, dtype=torch.double)
-        # self.W = torch.normal(0, 0.01, size=(self.p, self.q), device=device, dtype=torch.double)
-        self.W = torch.randn(p, q, device=device, dtype=torch.double) * torch.sqrt(torch.tensor(2.0 / p, device=device, dtype=torch.double))
+        self.b = torch.zeros(self.q, device=device, dtype=torch.float32)
+        self.a = torch.zeros(self.p, device=device, dtype=torch.float32)
+        self.W = torch.normal(0, 0.01, size=(self.p, self.q), device=device, dtype=torch.float32)
+        # xaiver initialization
+        # self.W = torch.randn(p, q, device=device, dtype=torch.float32) * torch.sqrt(torch.tensor(2.0 / p, device=device, dtype=torch.float32))
+        # self.W = torch.randn(p, q, device=device, dtype=torch.double) * torch.sqrt(torch.tensor(2.0 / p, device=device, dtype=torch.double))
 
     def entree_sortie_RBM(self, X_H):
-        return torch.sigmoid((X_H @ self.W + self.b))
+        # Convertir explicitement en float32
+        X_H = X_H.float()
+        return torch.sigmoid((X_H @ self.W.float() + self.b.float()))
         
     def sortie_entree_RBM(self, donnees_sortie):
+        # Convertir les tenseurs en float si nécessaire
+        if donnees_sortie.dtype != torch.float32:
+            donnees_sortie = donnees_sortie.float()
+        
+        # Vérifier si W et a sont également en float
+        if self.W.dtype != torch.float32:
+            self.W = self.W.float() 
+        
+        if self.a.dtype != torch.float32:
+            self.a = self.a.float()
+        
         return torch.sigmoid(donnees_sortie @ self.W.T + self.a)
     
     def train_RBM(self, x, epochs, lr, batch_size = None, plot=False, show_progress=False) :
@@ -37,7 +52,7 @@ class RBM:
         """
 
         if isinstance(x, np.ndarray): 
-            x = torch.from_numpy(x).to(device=device, dtype=torch.double)  
+            x = torch.from_numpy(x).to(device=device, dtype=torch.float32)  
         else:
             x = x.to(device)
             
@@ -56,9 +71,11 @@ class RBM:
                 v0 = X_batch # [batch_size,  p]
                 ## Forward pass
                 p_h_v0 = self.entree_sortie_RBM(v0)  # [batch_size,  q]
-                h0 = torch.bernoulli(p_h_v0) # [batch_size, q]
+                h0 = 1*(p_h_v0 > torch.rand(p_h_v0.shape, device = device)).to(device) # [batch_size, q]
+                h0 = h0.float()
                 p_v_h0 = self.sortie_entree_RBM(h0)  # [batch_size, p]
-                v1 = torch.bernoulli(p_v_h0) # [batch_size, p]
+                v1 = 1*(p_v_h0 > torch.rand(p_v_h0.shape, device = device)).to(device) # [batch_size, p]
+                v1 = v1.float()
                 p_h_v1 = self.entree_sortie_RBM(v1)  # [batch_size, q]
                 
                 ## Updating weights
@@ -87,9 +104,10 @@ class RBM:
             plt.xlabel('Epoch')
             plt.grid()
             plt.show()
+            return error_list
             
     def generer_image_RBM(self, iterations_gibbs, nb_images):
-        v = torch.randint(0, 2, (nb_images, self.p), dtype=torch.double, device=device) # [nb_images, p]
+        v = torch.randint(0, 2, (nb_images, self.p), dtype=torch.float32, device=device) # [nb_images, p]
         
         for _ in range(iterations_gibbs):
             p_h_v = self.entree_sortie_RBM(v)
@@ -108,7 +126,7 @@ class RBM:
 if __name__ == "__main__":
     list_rbm_caracs = []
     carac = ['C']
-    data = lire_alpha_digit([carac], path_data)
+    data = lire_alpha_digit(carac, path_data)
     nb_pixels = data.shape[1]
     rbm = RBM(p = nb_pixels, q = 100)
     rbm.train_RBM(x=data, epochs=200, lr=0.1, show_progress=True)

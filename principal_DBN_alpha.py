@@ -32,18 +32,14 @@ class DBN():
             batch_size = int(x.shape[0]*0.2)
 
         if isinstance(x, np.ndarray): 
-            x = torch.from_numpy(x).to(device=device, dtype=torch.double)  
+            x = torch.from_numpy(x).to(device=device, dtype=torch.float32)  
         else:
             x = x.to(device)
-        if len(epochs) != self.nb_couche - 1: 
-            epochs = [epochs[0]] * (self.nb_couche - 1)
 
-        iter = 0
         rbm_iterator = tqdm(self.list_RBM[:train_layers], desc="Training DBN", unit="RBM", disable= not show_progress)
         for rbm in rbm_iterator:
-            iter += 1
             rbm.train_RBM(
-                x, epochs=epochs[iter-1], lr=lr, batch_size=batch_size, plot=plot, show_progress=False
+                x, epochs=epochs, lr=lr, batch_size=batch_size, plot=plot, show_progress=False
             )
             x = rbm.entree_sortie_RBM(x)     
 
@@ -60,7 +56,7 @@ class DBN():
             list: A list of generated images, each represented as a 2D NumPy array.
         """
         # Initialize the visible layer
-        v = torch.randint(0, 2, (nb_images, self.layers[0]), dtype=torch.double, device=device)
+        v = torch.randint(0, 2, (nb_images, self.layers[0]), dtype=torch.float32, device=device)
 
         # Gibbs sampling
         for _ in range(iterations_gibbs):
