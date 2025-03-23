@@ -15,7 +15,6 @@ class DNN():
         self.pretrained = False
         self.nb_classes = nb_classes
         
-        
 
     def pretrain_DNN(self, x, epochs, lr, batch_size=None, show_progress=False):
         self.dbn.train_DBN(x=x, epochs=epochs, lr=lr, train_layers=self.dbn.nb_couche, batch_size=batch_size, show_progress=show_progress)
@@ -42,80 +41,12 @@ class DNN():
         return sortie
     
     
-    def build_model(self):
-        layers =  []
-        for i in range(self.dbn.nb_couche - 1):
-            layers.append(nn.Linear(self.dbn.list_RBM[i].W.shape[0], self.dbn.list_RBM[i].W.shape[1]))
-            layers.append(nn.Sigmoid())
-        layers.append(nn.Linear(self.dbn.list_RBM[-1].W.shape[0], self.dbn.list_RBM[-1].W.shape[1]))
-        layers.append(nn.Softmax(dim=1))
-        model = nn.Sequential(*layers)
-        
-        # initialize the weights and biases
-        if self.pretrained : 
-            for i in range(self.dbn.nb_couche - 1):
-                model[2*i].weight.data = torch.tensor(self.dbn.list_RBM[i].W.T, dtype=torch.float32, requires_grad=True)
-                model[2*i].bias.data = torch.tensor(self.dbn.list_RBM[i].b, dtype=torch.float32, requires_grad=True)
-                
-            model[-2].weight.data = torch.tensor(self.dbn.list_RBM[-1].W.T, dtype=torch.float32, requires_grad=True)
-            model[-2].bias.data = torch.tensor(self.dbn.list_RBM[-1].b, dtype=torch.float32, requires_grad=True)
-        return model.to(device)
-    
-    
-    def retropropagation_2(self, X,Y, epochs, lr, batch_size = None, plot=False, show_progress=False):
-        
-        model = self.build_model()
-        optimizer = optim.SGD(model.parameters(), lr=lr)
-        criterion = nn.CrossEntropyLoss()
-        if isinstance(X, np.ndarray):
-            X = torch.from_numpy(X).float().to(device)  
-        if isinstance(Y, np.ndarray):
-            Y = torch.from_numpy(Y).long().to(device)  
-        
-        if batch_size is None:
-            batch_size = int(np.floor(0.2 * X.shape[0]))
-            
-        dataset = torch.utils.data.TensorDataset(X, Y)
-        loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        couche = self.dbn.list_RBM[-1]
-        couche.W = torch.randn(int(couche.W.shape[0]), int(couche.W.shape[1])).float().to(device)*0.01
-        couche.b = torch.zeros((int(couche.b.shape[0]))).float().to(device)
-        
-        loss_list = []
-        epochs_iterator = tqdm(range(epochs), desc="Training DNN", unit="epoch", disable=not show_progress)
-        for e in epochs_iterator:
-            total_loss = 0.0
-            for X_batch, y_batch in loader:
-                optimizer.zero_grad()
-                y_hat = model(X_batch)
-                loss = criterion(y_hat, y_batch)
-                loss.backward()
-                optimizer.step()
-                loss_list.append(loss.item())
-                total_loss += loss.item()
-            if show_progress:
-                epochs_iterator.set_postfix({"Loss": loss_list[-1]})
-                
-        if plot is True:
-            plt.figure()
-            plt.plot(loss_list)
-            plt.xscale('log')
-            plt.yscale('log')
-            plt.xlabel('Epochs')
-            plt.ylabel('Loss')
-            plt.show()
-        
-    
     def retropropagation(self, X,Y, epochs, lr, batch_size = None, plot=False, show_progress=False):
-        if type(X) == np.ndarray: X = torch.from_numpy(X).float().to(device)
-        if type(Y) == np.ndarray: Y = torch.from_numpy(Y).float().to(device)
         
-        # if batch_size is None:
-        #     batch_size = int(np.floor(0.2 * X.shape[0]))
-        # initialisation des poids de la dernière couche
-        couche = self.dbn.list_RBM[-1]
-        couche.W = torch.randn(int(couche.W.shape[0]), int(couche.W.shape[1])).float().to(device)*0.01
-        couche.b = torch.zeros((int(couche.b.shape[0]))).float().to(device)
+        # # initialisation des poids de la dernière couche
+        # couche = self.dbn.list_RBM[-1]
+        # couche.W = torch.randn(int(couche.W.shape[0]), int(couche.W.shape[1])).float().to(device)*0.01
+        # couche.b = torch.zeros((int(couche.b.shape[0]))).float().to(device)
         
 
         loss_list = []
@@ -144,17 +75,23 @@ class DNN():
                             
                 # for i in range(self.dbn.nb_couche - 2, -1, -1):  
                 for i in reversed(range(self.dbn.nb_couche)): 
-                    if i == self.dbn.nb_couche - 1:
+                    if self.dbn.nb_couche == 1:
+                        # Special case: Only one layer (input to output)
                         delta_b = y_hat - y
-                        delta_W = sortie[i - 1].T @ delta_b                 
-                    elif i != 0:
-                        # Pour les couches cachées (sauf la première)
-                        delta_b = (delta_b @ self.dbn.list_RBM[i + 1].W.T) * (sortie[i] * (1 - sortie[i])) # delta_b @ W_L+1^T * f'(z_L)
-                        delta_W = sortie[i - 1].T @ delta_b
-                    elif i == 0: 
-                        # Pour la première couche
-                        delta_b = (delta_b @ self.dbn.list_RBM[i + 1].W.T) * (sortie[i] * (1 - sortie[i])) #[batch_size, p] @ [p, q] * [batch_size, q] = [batch_size, p]
-                        delta_W = x.T @ delta_b # [p, batch_size] @ [batch_size, q] = [p, q]
+                        delta_W = x.T @ delta_b  # Use input x directly
+                    else:
+                        if i == self.dbn.nb_couche - 1:
+                            # Last layer (output layer)
+                            delta_b = y_hat - y
+                            delta_W = sortie[i - 1].T @ delta_b
+                        elif i != 0:
+                            # Hidden layers (except the first)
+                            delta_b = (delta_b @ self.dbn.list_RBM[i + 1].W.T) * (sortie[i] * (1 - sortie[i]))  # delta_b @ W_L+1^T * f'(z_L)
+                            delta_W = sortie[i - 1].T @ delta_b
+                        elif i == 0:
+                            # First layer (input layer)
+                            delta_b = (delta_b @ self.dbn.list_RBM[i + 1].W.T) * (sortie[i] * (1 - sortie[i]))  # [batch_size, p] @ [p, q] * [batch_size, q] = [batch_size, p]
+                            delta_W = x.T @ delta_b  # [p, batch_size] @ [batch_size, q] = [p, q] 
                     
                     # self.dbn.list_RBM[i].W -= lr * delta_W/batch_size 
                     self.dbn.list_RBM[i].W -= lr * delta_W/batch_size
@@ -168,7 +105,7 @@ class DNN():
             plt.xlabel('Epochs')
             plt.ylabel('Loss')
             plt.show()
-        return loss_list
+            return loss_list
 
 
     def test_DNN(self, x, y):
