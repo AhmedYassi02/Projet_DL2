@@ -111,9 +111,9 @@ class RBM:
         
         for _ in range(iterations_gibbs):
             p_h_v = self.entree_sortie_RBM(v)
-            h = torch.bernoulli(p_h_v)
+            h = 1*(p_h_v > torch.rand(p_h_v.shape, device = device)).to(device)
             p_v_h = self.sortie_entree_RBM(h) 
-            v = torch.bernoulli(p_v_h)
+            v = 1*(p_v_h > torch.rand(p_v_h.shape, device = device)).to(device)
         list_img = []
         for img in range(nb_images):
             X = np.reshape(v[img].cpu().flatten(), (20, 16))

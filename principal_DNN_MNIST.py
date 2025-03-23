@@ -9,6 +9,11 @@ import torch.nn.functional as F
 class DNN():
     
     def __init__(self, layers_dbn, nb_classes):
+        """__init__ Constructeur de la classe DNN
+        Args:
+            layers_dbn (list): liste de neuronnes de chaque couche du réseau 
+            nb_classes (int): Nombre de classes à prédire
+        """
         self.dbn = DBN(layers_dbn)
         # ajouter une couche de classification supplémentaire
         self.dbn.list_RBM.append(RBM(p=layers_dbn[-1], q=nb_classes))
@@ -41,15 +46,15 @@ class DNN():
         return sortie
     
     
-    def retropropagation(self, X,Y, epochs, lr, batch_size = None, plot=False, show_progress=False):
+    def retropropagation(self, X,Y, epochs, lr, batch_size = None, retun_loss=False, show_progress=False):
         
-        # # initialisation des poids de la dernière couche
-        # couche = self.dbn.list_RBM[-1]
-        # couche.W = torch.randn(int(couche.W.shape[0]), int(couche.W.shape[1])).float().to(device)*0.01
-        # couche.b = torch.zeros((int(couche.b.shape[0]))).float().to(device)
+        # # initialisation des poids de la dernière couche car sinon ça marche pas
+        couche = self.dbn.list_RBM[-1]
+        couche.W = torch.randn(int(couche.W.shape[0]), int(couche.W.shape[1])).float().to(device)*0.01
+        couche.b = torch.zeros((int(couche.b.shape[0]))).float().to(device)
         
 
-        loss_list = []
+        self.loss_list = []
         epochs_iterator = tqdm(range(epochs), desc="Training DNN", unit="epoch", disable=not show_progress)
         for e in epochs_iterator:       
                 
@@ -67,18 +72,16 @@ class DNN():
                 y_hat = sortie[-1]
                 
                 loss = -torch.sum(y * torch.log(y_hat + 1e-8))/len(y)
-                loss_list.append(loss.cpu())
+                self.loss_list.append(loss.cpu())
                 
                 if show_progress:
                     epochs_iterator.set_postfix({"Loss": loss.item()})
                 
-                            
-                # for i in range(self.dbn.nb_couche - 2, -1, -1):  
+                         
                 for i in reversed(range(self.dbn.nb_couche)): 
                     if self.dbn.nb_couche == 1:
-                        # Special case: Only one layer (input to output)
                         delta_b = y_hat - y
-                        delta_W = x.T @ delta_b  # Use input x directly
+                        delta_W = x.T @ delta_b  
                     else:
                         if i == self.dbn.nb_couche - 1:
                             # Last layer (output layer)
@@ -97,15 +100,8 @@ class DNN():
                     self.dbn.list_RBM[i].W -= lr * delta_W/batch_size
                     self.dbn.list_RBM[i].b -= lr * delta_b.sum(axis=0)/batch_size # (sum over batch divide by batch_size)
             
-        if plot is True:
-            plt.figure()
-            plt.plot(loss_list)
-            plt.xscale('log')
-            plt.yscale('log')
-            plt.xlabel('Epochs')
-            plt.ylabel('Loss')
-            plt.show()
-            return loss_list
+        if retun_loss:
+            return self.loss_list
 
 
     def test_DNN(self, x, y):
@@ -114,7 +110,6 @@ class DNN():
         y_pred = torch.argmax(y_hat, axis=1).cpu()
         y_true = torch.argmax(y, axis=1).cpu()
         error = (y_pred != y_true).sum()/len(y_true)
-        # print(f"Taux d'erreur = {error}")
         return error, y_hat
 
 

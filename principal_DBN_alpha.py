@@ -62,12 +62,12 @@ class DBN():
         for _ in range(iterations_gibbs):
             for rbm in self.list_RBM:
                 p_h_v = rbm.entree_sortie_RBM(v)  
-                h = torch.bernoulli(p_h_v) 
+                h = 1*(p_h_v > torch.rand(p_h_v.shape, device = device)).to(device)
                 v = h  
 
             for rbm in self.list_RBM[::-1]:
                 p_v_h = rbm.sortie_entree_RBM(v)  
-                v = torch.bernoulli(p_v_h) 
+                v = 1*(p_v_h > torch.rand(p_v_h.shape, device = device)).to(device)
 
         imgs = []
         for img in range(nb_images):
